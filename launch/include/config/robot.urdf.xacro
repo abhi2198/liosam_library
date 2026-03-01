@@ -1,0 +1,7 @@
+<?xml version="1.0"?>
+<robot name="lio" xmlns:xacro="http://tixiaoshan.github.io/">
+  <xacro:property name="PI" value="3.1415926535897931" />
+
+  <link name="base_link"></link>
+
+</robot>

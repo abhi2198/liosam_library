@@ -1,0 +1,25 @@
+<launch>
+    <rosparam file="$(find lio_sam)/config/params.yaml" command="load" />
+
+    <node pkg="nodelet" type="nodelet" name="mapping_group" args="manager" output="screen">
+        <param name="use_multi_threaded_spinner" value="true"/>
+        <rosparam>
+                worker_threads: 8
+        </rosparam>
+    </node>
+
+    <node pkg="nodelet" type="nodelet" name="feature_extraction"
+            args="load lio_sam/FeatureExtractionNodelet mapping_group" output="screen">
+    </node>
+    <node pkg="nodelet" type="nodelet" name="image_projection"
+            args="load lio_sam/ImageProjectionNodelet mapping_group" output="screen" >
+    </node>
+    <node pkg="nodelet" type="nodelet" name="imu_preintegration"
+            args="load lio_sam/ImuPreintegrationNodelet mapping_group" output="screen">
+    </node>
+    <node pkg="nodelet" type="nodelet" name="map_optimization"
+            args="load lio_sam/MapOptimizationNodelet mapping_group" output="screen">
+    </node>
+
+    <include file="$(find lio_sam)/launch/include/module_rviz.launch" />
+</launch>

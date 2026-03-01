@@ -1,0 +1,30 @@
+<class_libraries>
+  <library path="libfeature_extraction_nodelet">
+    <class name="lio_sam/FeatureExtractionNodelet" type="lio_sam::FeatureExtractionNodelet" base_class_type="nodelet::Nodelet">
+      <description>
+      feature extraction nodelet
+      </description>
+    </class>
+  </library>
+  <library path="libimage_projection_nodelet">
+    <class name="lio_sam/ImageProjectionNodelet" type="lio_sam::ImageProjectionNodelet" base_class_type="nodelet::Nodelet">
+      <description>
+      Image projection nodelet
+      </description>
+    </class>
+  </library>
+  <library path="libimu_preintegration_nodelet">
+    <class name="lio_sam/ImuPreintegrationNodelet" type="lio_sam::ImuPreintegrationNodelet" base_class_type="nodelet::Nodelet">
+      <description>
+      Imu preintegration nodelet
+      </description>
+    </class>
+  </library>
+  <library path="libmap_optimization_nodelet">
+    <class name="lio_sam/MapOptimizationNodelet" type="lio_sam::MapOptimizationNodelet" base_class_type="nodelet::Nodelet">
+      <description>
+      Map Optimization nodelet
+      </description>
+    </class>
+  </library>
+</class_libraries>
