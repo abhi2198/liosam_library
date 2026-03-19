@@ -34,12 +34,11 @@ private:
   tf::TransformListener tfListener;
   tf::StampedTransform lidar2Baselink;
   ParamServer paramServer;
-  ros::NodeHandle& nh;
+  ros::NodeHandle* nh_;
+  bool rosEnabled_;
   double lidarOdomTime = -1;
   deque<nav_msgs::Odometry> imuOdomQueue;
-  // ros::NodeHandle &m_ros_nh;
 
-  // void initialize(ros::NodeHandle& nh);
   Eigen::Affine3f odom2affine(nav_msgs::Odometry odom);
   void lidarOdometryHandler(const nav_msgs::Odometry::ConstPtr& odomMsg);
   void imuOdometryHandler(const nav_msgs::Odometry::ConstPtr& odomMsg);
@@ -90,7 +89,8 @@ private:
   const double delta_t = 0;
 
   int key = 1;
-  ros::NodeHandle& nh;
+  ros::NodeHandle* nh_;
+  bool rosEnabled_;
   // T_bl: tramsform points from lidar frame to imu frame
   gtsam::Pose3 imu2Lidar = gtsam::Pose3(gtsam::Rot3(1, 0, 0, 0), gtsam::Point3(-extTrans.x(), -extTrans.y(), -extTrans.z()));
   // T_lb: tramsform points from imu frame to lidar frame
@@ -104,5 +104,13 @@ private:
 
 public:
   IMUPreintegration(ros::NodeHandle& nh);
+  IMUPreintegration(const ParamServer& params);
+
+  // Direct API (non-ROS)
+  void addImuDirect(double stamp, double ax, double ay, double az,
+                    double gx, double gy, double gz);
+  void processOdometryDirect(double stamp, const gtsam::Pose3& lidarPose,
+                             bool isDegenerate);
+  bool getLatestPose(Eigen::Affine3f& poseOut) const;
 };
 }

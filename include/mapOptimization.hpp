@@ -155,7 +155,8 @@ private:
   Eigen::Affine3f transPointAssociateToMap;
   Eigen::Affine3f incrementalOdometryAffineFront;
   Eigen::Affine3f incrementalOdometryAffineBack;
-  ros::NodeHandle& nh;
+  ros::NodeHandle* nh_;
+  bool rosEnabled_;
 
   void allocateMemory();
   void laserCloudInfoHandler(const lio_sam::cloud_infoConstPtr& msgIn);
@@ -203,7 +204,20 @@ private:
 
 public:
   mapOptimization(ros::NodeHandle& nh);
+  mapOptimization(const ParamServer& params);
   ~mapOptimization();
   void startThreads();
+
+  // Direct API (non-ROS)
+  bool processFeaturesDirect(double stamp,
+                             const lio_sam::cloud_info& cloudInfoIn,
+                             const pcl::PointCloud<PointType>::Ptr& cornerCloud,
+                             const pcl::PointCloud<PointType>::Ptr& surfCloud,
+                             Eigen::Affine3f& poseOut,
+                             Eigen::MatrixXd& covarianceOut,
+                             bool& isDegenerateOut);
+
+  // Get the local map for visualization
+  pcl::PointCloud<PointType>::Ptr getLocalMap() const;
 };
 }

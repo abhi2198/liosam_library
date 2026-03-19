@@ -66,7 +66,8 @@ private:
   double timeScanCur;
   double timeScanNext;
   std_msgs::Header cloudHeader;
-  ros::NodeHandle& nh;
+  ros::NodeHandle* nh_;
+  bool rosEnabled_;
 
   void allocateMemory();
   void resetParameters();
@@ -88,6 +89,17 @@ private:
 
 public:
   ImageProjection(ros::NodeHandle& nh);
+  ImageProjection(const ParamServer& params);
   ~ImageProjection();
+
+  // Direct API (non-ROS)
+  void addImuDirect(double stamp, double ax, double ay, double az,
+                    double gx, double gy, double gz,
+                    double qx, double qy, double qz, double qw);
+  void addOdomDirect(double stamp, const Eigen::Affine3f& pose, int resetCount);
+  bool processScanDirect(double stamp, double nextStamp,
+                         const pcl::PointCloud<PointXYZIRT>::Ptr& cloud,
+                         lio_sam::cloud_info& cloudInfoOut,
+                         pcl::PointCloud<PointType>::Ptr& extractedCloudOut);
 };
 }

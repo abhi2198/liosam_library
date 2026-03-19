@@ -53,6 +53,7 @@ generate_messages(
 
 catkin_package(
   INCLUDE_DIRS include
+  LIBRARIES lio_sam_core
   DEPENDS PCL GTSAM
 
   CATKIN_DEPENDS
@@ -164,10 +165,21 @@ add_library (map_optimization_nodelet src/nodelets/mapOptimizationNodelet.cpp)
 add_dependencies(map_optimization_nodelet ${catkin_EXPORTED_TARGETS} ${PROJECT_NAME}_generate_messages_cpp)
 target_compile_options(map_optimization_nodelet PRIVATE ${OpenMP_CXX_FLAGS})
 target_link_libraries(map_optimization_nodelet ${PROJECT_NAME}_MO ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${OpenCV_LIBRARIES} ${OpenMP_CXX_FLAGS} gtsam)
-# #### 
+# ####
 
+# Combined core library for rtabmap integration (non-ROS API)
+add_library(lio_sam_core
+  src/imageProjection.cpp
+  src/featureExtraction.cpp
+  src/mapOptmization.cpp
+  src/imuPreintegration.cpp
+  src/LioSamCore.cpp
+)
+add_dependencies(lio_sam_core ${catkin_EXPORTED_TARGETS} ${PROJECT_NAME}_generate_messages_cpp)
+target_compile_options(lio_sam_core PRIVATE ${OpenMP_CXX_FLAGS})
+target_link_libraries(lio_sam_core ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${OpenCV_LIBRARIES} ${OpenMP_CXX_FLAGS} gtsam)
 
-install(TARGETS ${PROJECT_NAME}_FE  ${PROJECT_NAME}_IP ${PROJECT_NAME}_IMU_P ${PROJECT_NAME}_MO feature_extraction_nodelet image_projection_nodelet imu_preintegration_nodelet map_optimization_nodelet
+install(TARGETS lio_sam_core ${PROJECT_NAME}_FE  ${PROJECT_NAME}_IP ${PROJECT_NAME}_IMU_P ${PROJECT_NAME}_MO feature_extraction_nodelet image_projection_nodelet imu_preintegration_nodelet map_optimization_nodelet
         ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
         LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
         RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}

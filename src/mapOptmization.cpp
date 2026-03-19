@@ -2,39 +2,54 @@
 
 namespace lio_sam
 {
-mapOptimization::mapOptimization(ros::NodeHandle& mnh) : nh(mnh), paramServer(loadParams(mnh))
+mapOptimization::mapOptimization(ros::NodeHandle& mnh) : nh_(&mnh), rosEnabled_(true), paramServer(loadParams(mnh))
 {
   ISAM2Params parameters;
   parameters.relinearizeThreshold = 0.1;
   parameters.relinearizeSkip = 1;
   isam = new ISAM2(parameters);
 
-  pubKeyPoses                 = nh.advertise<sensor_msgs::PointCloud2>("lio_sam/mapping/trajectory", 1);
-  pubLaserCloudSurround       = nh.advertise<sensor_msgs::PointCloud2>("lio_sam/mapping/map_global", 1);
-  pubLaserOdometryGlobal      = nh.advertise<nav_msgs::Odometry> ("lio_sam/mapping/odometry", 1);
-  pubLaserOdometryIncremental = nh.advertise<nav_msgs::Odometry> ("lio_sam/mapping/odometry_incremental", 1);
-  pubPath                     = nh.advertise<nav_msgs::Path>("lio_sam/mapping/path", 1);
+  pubKeyPoses                 = nh_->advertise<sensor_msgs::PointCloud2>("lio_sam/mapping/trajectory", 1);
+  pubLaserCloudSurround       = nh_->advertise<sensor_msgs::PointCloud2>("lio_sam/mapping/map_global", 1);
+  pubLaserOdometryGlobal      = nh_->advertise<nav_msgs::Odometry> ("lio_sam/mapping/odometry", 1);
+  pubLaserOdometryIncremental = nh_->advertise<nav_msgs::Odometry> ("lio_sam/mapping/odometry_incremental", 1);
+  pubPath                     = nh_->advertise<nav_msgs::Path>("lio_sam/mapping/path", 1);
 
-  subCloud = nh.subscribe<lio_sam::cloud_info>("lio_sam/feature/cloud_info", 1, &mapOptimization::laserCloudInfoHandler, this, ros::TransportHints().tcpNoDelay());
-  subGPS   = nh.subscribe<nav_msgs::Odometry> (paramServer.gpsTopic, 200, &mapOptimization::gpsHandler, this, ros::TransportHints().tcpNoDelay());
-  subLoop  = nh.subscribe<std_msgs::Float64MultiArray>("lio_loop/loop_closure_detection", 1, &mapOptimization::loopInfoHandler, this, ros::TransportHints().tcpNoDelay());
+  subCloud = nh_->subscribe<lio_sam::cloud_info>("lio_sam/feature/cloud_info", 1, &mapOptimization::laserCloudInfoHandler, this, ros::TransportHints().tcpNoDelay());
+  subGPS   = nh_->subscribe<nav_msgs::Odometry> (paramServer.gpsTopic, 200, &mapOptimization::gpsHandler, this, ros::TransportHints().tcpNoDelay());
+  subLoop  = nh_->subscribe<std_msgs::Float64MultiArray>("lio_loop/loop_closure_detection", 1, &mapOptimization::loopInfoHandler, this, ros::TransportHints().tcpNoDelay());
 
-  srvSaveMap  = nh.advertiseService("lio_sam/save_map", &mapOptimization::saveMapService, this);
+  srvSaveMap  = nh_->advertiseService("lio_sam/save_map", &mapOptimization::saveMapService, this);
 
-  pubHistoryKeyFrames   = nh.advertise<sensor_msgs::PointCloud2>("lio_sam/mapping/icp_loop_closure_history_cloud", 1);
-  pubIcpKeyFrames       = nh.advertise<sensor_msgs::PointCloud2>("lio_sam/mapping/icp_loop_closure_corrected_cloud", 1);
-  pubLoopConstraintEdge = nh.advertise<visualization_msgs::MarkerArray>("/lio_sam/mapping/loop_closure_constraints", 1);
+  pubHistoryKeyFrames   = nh_->advertise<sensor_msgs::PointCloud2>("lio_sam/mapping/icp_loop_closure_history_cloud", 1);
+  pubIcpKeyFrames       = nh_->advertise<sensor_msgs::PointCloud2>("lio_sam/mapping/icp_loop_closure_corrected_cloud", 1);
+  pubLoopConstraintEdge = nh_->advertise<visualization_msgs::MarkerArray>("/lio_sam/mapping/loop_closure_constraints", 1);
 
-  pubRecentKeyFrames    = nh.advertise<sensor_msgs::PointCloud2>("lio_sam/mapping/map_local", 1);
-  pubRecentKeyFrame     = nh.advertise<sensor_msgs::PointCloud2>("lio_sam/mapping/cloud_registered", 1);
-  pubCloudRegisteredRaw = nh.advertise<sensor_msgs::PointCloud2>("lio_sam/mapping/cloud_registered_raw", 1);
+  pubRecentKeyFrames    = nh_->advertise<sensor_msgs::PointCloud2>("lio_sam/mapping/map_local", 1);
+  pubRecentKeyFrame     = nh_->advertise<sensor_msgs::PointCloud2>("lio_sam/mapping/cloud_registered", 1);
+  pubCloudRegisteredRaw = nh_->advertise<sensor_msgs::PointCloud2>("lio_sam/mapping/cloud_registered_raw", 1);
 
-  pubSLAMInfo           = nh.advertise<lio_sam::cloud_info>("lio_sam/mapping/slam_info", 1);
+  pubSLAMInfo           = nh_->advertise<lio_sam::cloud_info>("lio_sam/mapping/slam_info", 1);
 
   downSizeFilterCorner.setLeafSize(paramServer.mappingCornerLeafSize, paramServer.mappingCornerLeafSize, paramServer.mappingCornerLeafSize);
   downSizeFilterSurf.setLeafSize(paramServer.mappingSurfLeafSize, paramServer.mappingSurfLeafSize, paramServer.mappingSurfLeafSize);
   downSizeFilterICP.setLeafSize(paramServer.mappingSurfLeafSize, paramServer.mappingSurfLeafSize, paramServer.mappingSurfLeafSize);
   downSizeFilterSurroundingKeyPoses.setLeafSize(paramServer.surroundingKeyframeDensity, paramServer.surroundingKeyframeDensity, paramServer.surroundingKeyframeDensity);     // for surrounding key poses of scan-to-map optimization
+
+  allocateMemory();
+}
+
+mapOptimization::mapOptimization(const ParamServer& params) : nh_(nullptr), rosEnabled_(false), paramServer(params)
+{
+  ISAM2Params parameters;
+  parameters.relinearizeThreshold = 0.1;
+  parameters.relinearizeSkip = 1;
+  isam = new ISAM2(parameters);
+
+  downSizeFilterCorner.setLeafSize(paramServer.mappingCornerLeafSize, paramServer.mappingCornerLeafSize, paramServer.mappingCornerLeafSize);
+  downSizeFilterSurf.setLeafSize(paramServer.mappingSurfLeafSize, paramServer.mappingSurfLeafSize, paramServer.mappingSurfLeafSize);
+  downSizeFilterICP.setLeafSize(paramServer.mappingSurfLeafSize, paramServer.mappingSurfLeafSize, paramServer.mappingSurfLeafSize);
+  downSizeFilterSurroundingKeyPoses.setLeafSize(paramServer.surroundingKeyframeDensity, paramServer.surroundingKeyframeDensity, paramServer.surroundingKeyframeDensity);
 
   allocateMemory();
 }
@@ -1608,6 +1623,7 @@ void mapOptimization::updatePath(const PointTypePose& pose_in)
 
 void mapOptimization::publishOdometry()
 {
+  if (!rosEnabled_) return;
   // Publish odometry for ROS (global)
   nav_msgs::Odometry laserOdometryROS;
   laserOdometryROS.header.stamp = timeLaserInfoStamp;
@@ -1685,6 +1701,7 @@ void mapOptimization::publishOdometry()
 
 void mapOptimization::publishFrames()
 {
+  if (!rosEnabled_) return;
   if (cloudKeyPoses3D->points.empty())
   {
     return;
@@ -1740,6 +1757,54 @@ void mapOptimization::publishFrames()
     }
   }
 }
+
+// --- Direct API (non-ROS) ---
+
+bool mapOptimization::processFeaturesDirect(double stamp,
+                                            const lio_sam::cloud_info& cloudInfoIn,
+                                            const pcl::PointCloud<PointType>::Ptr& cornerCloud,
+                                            const pcl::PointCloud<PointType>::Ptr& surfCloud,
+                                            Eigen::Affine3f& poseOut,
+                                            Eigen::MatrixXd& covarianceOut,
+                                            bool& isDegenerateOut)
+{
+  // Set timestamp
+  timeLaserInfoStamp = ros::Time(stamp);
+  timeLaserInfoCur = stamp;
+
+  // Set cloud info and feature clouds
+  cloudInfo = cloudInfoIn;
+  *laserCloudCornerLast = *cornerCloud;
+  *laserCloudSurfLast = *surfCloud;
+
+  std::lock_guard<std::mutex> lock(mtx);
+
+  updateInitialGuess();
+  extractSurroundingKeyFrames();
+  downsampleCurrentScan();
+  scan2MapOptimization();
+  saveKeyFramesAndFactor();
+  correctPoses();
+
+  // Extract output pose
+  poseOut = trans2Affine3f(transformTobeMapped);
+  covarianceOut = poseCovariance;
+  isDegenerateOut = isDegenerate;
+
+  // Store incremental for next call
+  incrementalOdometryAffineBack = trans2Affine3f(transformTobeMapped);
+
+  return true;
+}
+
+pcl::PointCloud<PointType>::Ptr mapOptimization::getLocalMap() const
+{
+  pcl::PointCloud<PointType>::Ptr localMap(new pcl::PointCloud<PointType>());
+  *localMap += *laserCloudCornerFromMapDS;
+  *localMap += *laserCloudSurfFromMapDS;
+  return localMap;
+}
+
 };
 
 // int main(int argc, char** argv)

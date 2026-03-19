@@ -2,15 +2,20 @@
 
 namespace lio_sam
 {
-FeatureExtraction::FeatureExtraction(ros::NodeHandle& mnh) : nh(mnh), paramServer(loadParams(mnh))
+FeatureExtraction::FeatureExtraction(ros::NodeHandle& mnh) : nh_(&mnh), rosEnabled_(true), paramServer(loadParams(mnh))
 {
   ROS_WARN("FeatureExtraction initialized properly");
-  subLaserCloudInfo = nh.subscribe<lio_sam::cloud_info>("lio_sam/deskew/cloud_info", 1, &FeatureExtraction::laserCloudInfoHandler, this, ros::TransportHints().tcpNoDelay());
+  subLaserCloudInfo = nh_->subscribe<lio_sam::cloud_info>("lio_sam/deskew/cloud_info", 1, &FeatureExtraction::laserCloudInfoHandler, this, ros::TransportHints().tcpNoDelay());
 
-  pubLaserCloudInfo = nh.advertise<lio_sam::cloud_info> ("lio_sam/feature/cloud_info", 1);
-  pubCornerPoints = nh.advertise<sensor_msgs::PointCloud2>("lio_sam/feature/cloud_corner", 1);
-  pubSurfacePoints = nh.advertise<sensor_msgs::PointCloud2>("lio_sam/feature/cloud_surface", 1);
+  pubLaserCloudInfo = nh_->advertise<lio_sam::cloud_info> ("lio_sam/feature/cloud_info", 1);
+  pubCornerPoints = nh_->advertise<sensor_msgs::PointCloud2>("lio_sam/feature/cloud_corner", 1);
+  pubSurfacePoints = nh_->advertise<sensor_msgs::PointCloud2>("lio_sam/feature/cloud_surface", 1);
 
+  initializationValue();
+}
+
+FeatureExtraction::FeatureExtraction(const ParamServer& params) : nh_(nullptr), rosEnabled_(false), paramServer(params)
+{
   initializationValue();
 }
 
@@ -231,23 +236,41 @@ void FeatureExtraction::freeCloudInfoMemory()
 
 void FeatureExtraction::publishFeatureCloud()
 {
-  // free cloud info memory
-  freeCloudInfoMemory();
-  // save newly extracted features
-  cloudInfo.cloud_corner  = publishCloud(pubCornerPoints,  cornerCloud,  cloudHeader.stamp, paramServer.baselinkFrame);
-  cloudInfo.cloud_surface = publishCloud(pubSurfacePoints, surfaceCloud, cloudHeader.stamp, paramServer.baselinkFrame);
-  // publish to mapOptimization
-  pubLaserCloudInfo.publish(cloudInfo);
+  if (rosEnabled_)
+  {
+    // free cloud info memory
+    freeCloudInfoMemory();
+    // save newly extracted features
+    cloudInfo.cloud_corner  = publishCloud(pubCornerPoints,  cornerCloud,  cloudHeader.stamp, paramServer.baselinkFrame);
+    cloudInfo.cloud_surface = publishCloud(pubSurfacePoints, surfaceCloud, cloudHeader.stamp, paramServer.baselinkFrame);
+    // publish to mapOptimization
+    pubLaserCloudInfo.publish(cloudInfo);
+  }
 }
+
+// --- Direct API (non-ROS) ---
+
+void FeatureExtraction::processCloudDirect(lio_sam::cloud_info& cloudInfoInOut,
+                                           const pcl::PointCloud<PointType>::Ptr& extractedCloudIn,
+                                           pcl::PointCloud<PointType>::Ptr& cornerCloudOut,
+                                           pcl::PointCloud<PointType>::Ptr& surfaceCloudOut)
+{
+  cloudInfo = cloudInfoInOut;
+  *extractedCloud = *extractedCloudIn;
+
+  calculateSmoothness();
+  markOccludedPoints();
+  extractFeatures();
+
+  // Copy results
+  cornerCloudOut.reset(new pcl::PointCloud<PointType>());
+  surfaceCloudOut.reset(new pcl::PointCloud<PointType>());
+  *cornerCloudOut = *cornerCloud;
+  *surfaceCloudOut = *surfaceCloud;
+
+  // Update cloudInfo (free memory of large fields not needed downstream)
+  freeCloudInfoMemory();
+  cloudInfoInOut = cloudInfo;
+}
+
 };
-
-// int main(int argc, char** argv)
-// {
-//   ros::init(argc, argv, "lio_sam");
-//   FeatureExtraction FE;
-//   ROS_INFO("\033[1;32m----> Feature Extraction Started.\033[0m");
-
-//   ros::spin();
-
-//   return 0;
-// }

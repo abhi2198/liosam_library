@@ -39,7 +39,8 @@ class FeatureExtraction
   float* cloudCurvature;
   int* cloudNeighborPicked;
   int* cloudLabel;
-  ros::NodeHandle& nh;
+  ros::NodeHandle* nh_;
+  bool rosEnabled_;
   std::unique_ptr<ParamServer> m_param_server;   // Use unique_ptr for dynamic allocation
   void initializationValue();
   void laserCloudInfoHandler(const lio_sam::cloud_infoConstPtr& msgIn);
@@ -51,5 +52,12 @@ class FeatureExtraction
 
 public:
   FeatureExtraction(ros::NodeHandle&);
+  FeatureExtraction(const ParamServer& params);
+
+  // Direct API (non-ROS)
+  void processCloudDirect(lio_sam::cloud_info& cloudInfoInOut,
+                          const pcl::PointCloud<PointType>::Ptr& extractedCloudIn,
+                          pcl::PointCloud<PointType>::Ptr& cornerCloudOut,
+                          pcl::PointCloud<PointType>::Ptr& surfaceCloudOut);
 };
 };

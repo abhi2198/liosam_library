@@ -62,10 +62,10 @@ typedef pcl::PointXYZI PointType;
 
 enum class SensorType { VELODYNE, OUSTER, LIVOX };
 
-Eigen::Matrix3d extRot;
-Eigen::Matrix3d extRPY;
-Eigen::Vector3d extTrans;
-Eigen::Quaterniond extQRPY;
+inline Eigen::Matrix3d extRot;
+inline Eigen::Matrix3d extRPY;
+inline Eigen::Vector3d extTrans;
+inline Eigen::Quaterniond extQRPY;
 struct ParamServer
 {
   std::string robot_id;
@@ -150,7 +150,7 @@ struct ParamServer
   float globalMapVisualizationLeafSize;
 };
 
-ParamServer loadParams(ros::NodeHandle& nh)
+inline ParamServer loadParams(ros::NodeHandle& nh)
 {
   ParamServer paramServer;
   ROS_WARN("here");
@@ -253,7 +253,7 @@ ParamServer loadParams(ros::NodeHandle& nh)
   return paramServer;
 }
 
-sensor_msgs::Imu imuConverter(const sensor_msgs::Imu& imu_in)
+inline sensor_msgs::Imu imuConverter(const sensor_msgs::Imu& imu_in)
 {
   sensor_msgs::Imu imu_out = imu_in;
   // rotate acceleration

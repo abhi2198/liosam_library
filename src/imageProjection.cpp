@@ -2,18 +2,27 @@
 
 namespace lio_sam
 {
-ImageProjection::ImageProjection(ros::NodeHandle& mnh) : nh(mnh), paramServer(loadParams(mnh)),
+ImageProjection::ImageProjection(ros::NodeHandle& mnh) : nh_(&mnh), rosEnabled_(true), paramServer(loadParams(mnh)),
   deskewFlag(0)
 {
-  subImu = nh.subscribe<sensor_msgs::Imu>(paramServer.imuTopic, 2000, &ImageProjection::imuHandler, this, ros::TransportHints().tcpNoDelay());
-  subOdom = nh.subscribe<nav_msgs::Odometry>(paramServer.odomTopic + "_incremental", 2000, &ImageProjection::odometryHandler, this, ros::TransportHints().tcpNoDelay());
-  subLaserCloud = nh.subscribe<sensor_msgs::PointCloud2>(paramServer.pointCloudTopic, 5, &ImageProjection::cloudHandler, this, ros::TransportHints().tcpNoDelay());
-  pubExtractedCloud = nh.advertise<sensor_msgs::PointCloud2> ("lio_sam/deskew/cloud_deskewed", 1);
-  pubLaserCloudInfo = nh.advertise<lio_sam::cloud_info> ("lio_sam/deskew/cloud_info", 1);
+  subImu = nh_->subscribe<sensor_msgs::Imu>(paramServer.imuTopic, 2000, &ImageProjection::imuHandler, this, ros::TransportHints().tcpNoDelay());
+  subOdom = nh_->subscribe<nav_msgs::Odometry>(paramServer.odomTopic + "_incremental", 2000, &ImageProjection::odometryHandler, this, ros::TransportHints().tcpNoDelay());
+  subLaserCloud = nh_->subscribe<sensor_msgs::PointCloud2>(paramServer.pointCloudTopic, 5, &ImageProjection::cloudHandler, this, ros::TransportHints().tcpNoDelay());
+  pubExtractedCloud = nh_->advertise<sensor_msgs::PointCloud2> ("lio_sam/deskew/cloud_deskewed", 1);
+  pubLaserCloudInfo = nh_->advertise<lio_sam::cloud_info> ("lio_sam/deskew/cloud_info", 1);
   ImageProjection::allocateMemory();
   ImageProjection::resetParameters();
   pcl::console::setVerbosityLevel(pcl::console::L_ERROR);
 }
+
+ImageProjection::ImageProjection(const ParamServer& params) : nh_(nullptr), rosEnabled_(false), paramServer(params),
+  deskewFlag(0)
+{
+  ImageProjection::allocateMemory();
+  ImageProjection::resetParameters();
+  pcl::console::setVerbosityLevel(pcl::console::L_ERROR);
+}
+
 void ImageProjection::allocateMemory()
 {
   ROS_WARN(" in allocate mem");
@@ -71,23 +80,6 @@ void ImageProjection::imuHandler(const sensor_msgs::Imu::ConstPtr& imuMsg)
 
   std::lock_guard<std::mutex> lock1(imuLock);
   imuQueue.push_back(thisImu);
-
-  // debug IMU data
-  // cout << std::setprecision(6);
-  // cout << "IMU acc: " << endl;
-  // cout << "x: " << thisImu.linear_acceleration.x <<
-  //       ", y: " << thisImu.linear_acceleration.y <<
-  //       ", z: " << thisImu.linear_acceleration.z << endl;
-  // cout << "IMU gyro: " << endl;
-  // cout << "x: " << thisImu.angular_velocity.x <<
-  //       ", y: " << thisImu.angular_velocity.y <<
-  //       ", z: " << thisImu.angular_velocity.z << endl;
-  // double imuRoll, imuPitch, imuYaw;
-  // tf::Quaternion orientation;
-  // tf::quaternionMsgToTF(thisImu.orientation, orientation);
-  // tf::Matrix3x3(orientation).getRPY(imuRoll, imuPitch, imuYaw);
-  // cout << "IMU roll pitch yaw: " << endl;
-  // cout << "roll: " << imuRoll << ", pitch: " << imuPitch << ", yaw: " << imuYaw << endl << endl;
 }
 
 void ImageProjection::odometryHandler(const nav_msgs::Odometry::ConstPtr& odometryMsg)
@@ -145,26 +137,6 @@ bool ImageProjection::cachePointCloud(const sensor_msgs::PointCloud2ConstPtr& la
     ROS_ERROR("Point cloud is not in dense format, please remove NaN points first!");
     ros::shutdown();
   }
-
-  // // check ring channel
-  // static int ringFlag = 0;
-  // if (ringFlag == 0)
-  // {
-  //     ringFlag = -1;
-  //     for (int i = 0; i < (int)currentCloudMsg.fields.size(); ++i)
-  //     {
-  //         if (currentCloudMsg.fields[i].name == "ring")
-  //         {
-  //             ringFlag = 1;
-  //             break;
-  //         }
-  //     }
-  //     if (ringFlag == -1)
-  //     {
-  //         ROS_ERROR("Point cloud ring channel not available, please configure your point cloud data!");
-  //         ros::shutdown();
-  //     }
-  // }
 
   // check point time
   if (deskewFlag == 0)
@@ -415,8 +387,6 @@ void ImageProjection::findPosition(double relTime, float* posXCur, float* posYCu
 {
   *posXCur = 0; *posYCur = 0; *posZCur = 0;
 
-  // If the sensor moves relatively slow, like walking speed, positional deskew seems to have little benefits. Thus code below is commented.
-
   if (cloudInfo.odomAvailable == false || odomDeskewFlag == false)
   {
     return;
@@ -435,9 +405,6 @@ PointType ImageProjection::deskewPoint(PointType* point, double relTime)
   {
     return *point;
   }
-  // if (cloudInfo.imuAvailable == false)
-  //     return *point;
-  // std::cout<<"deskewPoint begin"<<std::endl;
   double pointTime = timeScanCur + relTime;
 
   float rotXCur, rotYCur, rotZCur;
@@ -572,20 +539,8 @@ void ImageProjection::projectPointCloud()
       }
     }
     double relTime = (ori - startOri) / (endOri - startOri) * 0.1;
-    // if(i==0)
-    // std::cout<<"first time is:"<<relTime<<std::endl;
-
-    // if(i%100==0){
-    //     std::cout<<" time is:"<<relTime<<std::endl;
-
-    // }
-    // if(i==cloudSize-1){
-    //     std::cout<<"last time is:"<<relTime<<std::endl<<std::endl;
-    // }
 
     thisPoint = deskewPoint(&thisPoint, relTime);      // rslidar
-    // thisPoint = deskewPoint(&thisPoint, laserCloudIn->points[i].time); // Velodyne
-    // thisPoint = deskewPoint(&thisPoint, (float)laserCloudIn->points[i].t / 1000000000.0); // Ouster
 
     rangeMat.at<float>(rowIdn, columnIdn) = pointDistance(thisPoint);
 
@@ -622,19 +577,104 @@ void ImageProjection::cloudExtraction()
 
 void ImageProjection::publishClouds()
 {
-  cloudInfo.header = cloudHeader;
-  cloudInfo.cloud_deskewed  = publishCloud(pubExtractedCloud, extractedCloud, cloudHeader.stamp, paramServer.lidarFrame);
-  pubLaserCloudInfo.publish(cloudInfo);
+  if (rosEnabled_)
+  {
+    cloudInfo.header = cloudHeader;
+    cloudInfo.cloud_deskewed  = publishCloud(pubExtractedCloud, extractedCloud, cloudHeader.stamp, paramServer.lidarFrame);
+    pubLaserCloudInfo.publish(cloudInfo);
+  }
 }
+
+// --- Direct API (non-ROS) ---
+
+void ImageProjection::addImuDirect(double stamp, double ax, double ay, double az,
+                                   double gx, double gy, double gz,
+                                   double qx, double qy, double qz, double qw)
+{
+  sensor_msgs::Imu imuMsg;
+  imuMsg.header.stamp = ros::Time(stamp);
+  // Data is assumed to already be in the correct frame (already converted)
+  imuMsg.linear_acceleration.x = ax;
+  imuMsg.linear_acceleration.y = ay;
+  imuMsg.linear_acceleration.z = az;
+  imuMsg.angular_velocity.x = gx;
+  imuMsg.angular_velocity.y = gy;
+  imuMsg.angular_velocity.z = gz;
+  imuMsg.orientation.x = qx;
+  imuMsg.orientation.y = qy;
+  imuMsg.orientation.z = qz;
+  imuMsg.orientation.w = qw;
+
+  std::lock_guard<std::mutex> lock1(imuLock);
+  imuQueue.push_back(imuMsg);
+}
+
+void ImageProjection::addOdomDirect(double stamp, const Eigen::Affine3f& pose, int resetCount)
+{
+  float x, y, z, roll, pitch, yaw;
+  pcl::getTranslationAndEulerAngles(pose, x, y, z, roll, pitch, yaw);
+
+  nav_msgs::Odometry odomMsg;
+  odomMsg.header.stamp = ros::Time(stamp);
+  odomMsg.pose.pose.position.x = x;
+  odomMsg.pose.pose.position.y = y;
+  odomMsg.pose.pose.position.z = z;
+  odomMsg.pose.pose.orientation = tf::createQuaternionMsgFromRollPitchYaw(roll, pitch, yaw);
+  odomMsg.pose.covariance[0] = resetCount;
+
+  std::lock_guard<std::mutex> lock2(odoLock);
+  odomQueue.push_back(odomMsg);
+}
+
+bool ImageProjection::processScanDirect(double stamp, double nextStamp,
+                                        const pcl::PointCloud<PointXYZIRT>::Ptr& cloud,
+                                        lio_sam::cloud_info& cloudInfoOut,
+                                        pcl::PointCloud<PointType>::Ptr& extractedCloudOut)
+{
+  // Set timestamps directly (bypass cachePointCloud)
+  timeScanCur = stamp;
+  timeScanNext = nextStamp;
+
+  // Copy cloud directly
+  *laserCloudIn = *cloud;
+
+  // Check if time field is available (enable deskewing if points have time)
+  if (deskewFlag == 0)
+  {
+    // Assume time is available since we're using PointXYZIRT
+    bool hasTime = false;
+    for (size_t i = 0; i < cloud->points.size(); ++i)
+    {
+      if (cloud->points[i].time != 0.0f)
+      {
+        hasTime = true;
+        break;
+      }
+    }
+    deskewFlag = hasTime ? 1 : -1;
+  }
+
+  // Run deskewing (uses imuQueue and odomQueue)
+  if (!deskewInfo())
+  {
+    // If no IMU data, still process but without deskewing
+    cloudInfo.imuAvailable = false;
+    cloudInfo.odomAvailable = false;
+  }
+
+  // Run projection and extraction
+  projectPointCloud();
+  cloudExtraction();
+
+  // Copy results
+  cloudInfoOut = cloudInfo;
+  extractedCloudOut.reset(new pcl::PointCloud<PointType>());
+  *extractedCloudOut = *extractedCloud;
+
+  // Reset for next call
+  resetParameters();
+
+  return (extractedCloudOut->size() > 0);
+}
+
 };
-// int main(int argc, char** argv)
-// {
-//   ros::init(argc, argv, "lio_sam");
-//   ImageProjection IP;
-//   ROS_INFO("\033[1;32m----> Image Projection Started.\033[0m");
-
-//   ros::MultiThreadedSpinner spinner(3);
-//   spinner.spin();
-
-//   return 0;
-// }
