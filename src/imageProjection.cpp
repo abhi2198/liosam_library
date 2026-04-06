@@ -657,9 +657,10 @@ bool ImageProjection::processScanDirect(double stamp, double nextStamp,
   // Run deskewing (uses imuQueue and odomQueue)
   if (!deskewInfo())
   {
-    // If no IMU data, still process but without deskewing
-    cloudInfo.imuAvailable = false;
-    cloudInfo.odomAvailable = false;
+    // Match standalone behavior: skip scan if IMU data doesn't span the scan period
+    ROS_DEBUG("processScanDirect: deskewInfo failed, skipping scan");
+    resetParameters();
+    return false;
   }
 
   // Run projection and extraction

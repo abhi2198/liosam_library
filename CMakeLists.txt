@@ -136,6 +136,7 @@ link_directories(
 
 
 add_library (${PROJECT_NAME}_FE src/featureExtraction.cpp)
+add_dependencies(${PROJECT_NAME}_FE ${catkin_EXPORTED_TARGETS} ${PROJECT_NAME}_generate_messages_cpp)
 target_link_libraries(${PROJECT_NAME}_FE ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${OpenCV_LIBRARIES})
 
 add_library (feature_extraction_nodelet src/nodelets/featureExtractionNodelet.cpp)
@@ -143,6 +144,7 @@ add_dependencies(feature_extraction_nodelet ${catkin_EXPORTED_TARGETS} ${PROJECT
 target_link_libraries(feature_extraction_nodelet ${PROJECT_NAME}_FE ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${OpenCV_LIBRARIES})
 
 add_library (${PROJECT_NAME}_IP src/imageProjection.cpp)
+add_dependencies(${PROJECT_NAME}_IP ${catkin_EXPORTED_TARGETS} ${PROJECT_NAME}_generate_messages_cpp)
 target_link_libraries(${PROJECT_NAME}_IP ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${OpenCV_LIBRARIES})
 
 add_library (image_projection_nodelet src/nodelets/imageProjectionNodelet.cpp)
@@ -150,6 +152,7 @@ add_dependencies(image_projection_nodelet ${catkin_EXPORTED_TARGETS} ${PROJECT_N
 target_link_libraries(image_projection_nodelet ${PROJECT_NAME}_IP  ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${OpenCV_LIBRARIES})
 
 add_library (${PROJECT_NAME}_IMU_P src/imuPreintegration.cpp)
+add_dependencies(${PROJECT_NAME}_IMU_P ${catkin_EXPORTED_TARGETS} ${PROJECT_NAME}_generate_messages_cpp)
 target_link_libraries(${PROJECT_NAME}_IMU_P ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${OpenCV_LIBRARIES} gtsam)
 
 add_library (imu_preintegration_nodelet src/nodelets/imuPreintegrationNodelet.cpp)
@@ -158,6 +161,7 @@ target_link_libraries(imu_preintegration_nodelet ${PROJECT_NAME}_IMU_P ${catkin_
 
 
 add_library (${PROJECT_NAME}_MO src/mapOptmization.cpp)
+add_dependencies(${PROJECT_NAME}_MO ${catkin_EXPORTED_TARGETS} ${PROJECT_NAME}_generate_messages_cpp)
 target_compile_options(${PROJECT_NAME}_MO PRIVATE ${OpenMP_CXX_FLAGS})
 target_link_libraries(${PROJECT_NAME}_MO ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${OpenCV_LIBRARIES} gtsam)
 
