@@ -30,6 +30,7 @@ find_package(OpenMP REQUIRED)
 find_package(PCL REQUIRED QUIET)
 find_package(OpenCV REQUIRED QUIET)
 find_package(GTSAM REQUIRED QUIET)
+find_package(yaml-cpp REQUIRED)
 
 add_message_files(
   DIRECTORY msg
@@ -178,10 +179,11 @@ add_library(lio_sam_core
   src/mapOptmization.cpp
   src/imuPreintegration.cpp
   src/LioSamCore.cpp
+  src/paramLoader.cpp
 )
 add_dependencies(lio_sam_core ${catkin_EXPORTED_TARGETS} ${PROJECT_NAME}_generate_messages_cpp)
 target_compile_options(lio_sam_core PRIVATE ${OpenMP_CXX_FLAGS})
-target_link_libraries(lio_sam_core ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${OpenCV_LIBRARIES} ${OpenMP_CXX_FLAGS} gtsam)
+target_link_libraries(lio_sam_core ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${OpenCV_LIBRARIES} ${OpenMP_CXX_FLAGS} gtsam yaml-cpp)
 
 install(TARGETS lio_sam_core ${PROJECT_NAME}_FE  ${PROJECT_NAME}_IP ${PROJECT_NAME}_IMU_P ${PROJECT_NAME}_MO feature_extraction_nodelet image_projection_nodelet imu_preintegration_nodelet map_optimization_nodelet
         ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}

@@ -253,6 +253,9 @@ inline ParamServer loadParams(ros::NodeHandle& nh)
   return paramServer;
 }
 
+// Loads LIO-SAM parameters from a YAML config file (implementation in paramLoader.cpp)
+ParamServer loadParamsFromYaml(const std::string& yamlPath);
+
 inline sensor_msgs::Imu imuConverter(const sensor_msgs::Imu& imu_in)
 {
   sensor_msgs::Imu imu_out = imu_in;
