@@ -52,7 +52,8 @@ bool LioSamCore::processScan(double stamp,
                              const std::vector<int>& rings,
                              const std::vector<float>& times,
                              Eigen::Affine3f& poseOut,
-                             Eigen::MatrixXd& covarianceOut)
+                             Eigen::MatrixXd& covarianceOut,
+                             pcl::PointCloud<pcl::PointXYZI>::Ptr deskewedCloudOut)
 {
   if (cloud->empty())
   {
@@ -94,6 +95,14 @@ bool LioSamCore::processScan(double stamp,
   if (!projOk || !extractedCloud || extractedCloud->empty())
   {
     return false;
+  }
+
+  // Expose the deskewed cloud so the caller can propagate it to downstream
+  // consumers (loop closure, etc.) that would otherwise see the raw scan.
+  // PointType is pcl::PointXYZI, matching deskewedCloudOut's point type.
+  if (deskewedCloudOut)
+  {
+    *deskewedCloudOut = *extractedCloud;
   }
 
   // Step 2: Feature Extraction
